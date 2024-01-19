@@ -1,9 +1,3 @@
-# 目的：ドロネー分割を節点番号表記に変更．その後，PDSによる点群生成．
-# Input：ドロネー分割の結果（座標値のみ：③の結果）＆　②の結果
-# Output：PDSの点群座標.plyファイル，PDSの点群座標.csvファイル
-# ver2との違い：trimeshをCNAで用いるため，SPLITを消した．またCOEFFICIENT_OF_LONGも消した
-
-from modules import Point
 from modules import CrossingNumberAlgorithm
 from modules import CheckDistance
 from scipy.interpolate import Rbf
@@ -15,44 +9,31 @@ import random
 # define
 MAXIMUM_NUMBER_OF_SEARCHES = 800 # 点が連続でN回生成できなかったら終了
 MAXIMUM_NUMBER_OF_POINTS = 600 # 物体内部最大生成点数
-PITCH = 1 # kikalabの物体表面に点群を生成するときに用いる．
-#RATE_OF_THINNINGS = 0.05 # 間引き後の点の割合．例：0.05→5%
+PITCH_SURFACE = 1 # 物体表面に点群を生成するときに用いる．
+PITCH_MABIKI = 3 # 物体表面に生成した点から間引きを行う際のPDSの最小点間距離
 ALLOWABLE_STRESS = 186 #チタン合金．降伏強さ930MPa．安全率5
-PDS_PITCH = 3 # 物体表面に生成した点から間引きを行う際のPDSの最小点間距離
-
+RADIUS = 0.05 # ラティス半径[mm]
 
 
 # Inputファイル
-# input_path = './Input/Column10_0615.csv' # ANSYSのデータファイル
-input_path = './Input/cube_50x50mm.csv' # ANSYSのデータファイル
+input_path = './Input/Stress/cube_50x50mm.csv' # ANSYSのデータファイル
 mesh_data = 'Input/Mesh_Data/cube_50x50mm_mesh.stl' # 物体の表面形状データ。
 
 # Outputファイル
-resultIn_ply_path = 'Output/result_main/resultIn.ply' # 内部点のみ表示
-result_ply_path = 'Output/result_main/result.ply'
-result_csv_path = 'Output/result_main/result.csv'
-biharmonic_path = 'Output/Biharmonic/biharmonic_param.csv'
-
+surface_Points_path = 'Output/PDS/surface1.ply' # 表面点のみ表示
+inner_Points_path = 'Output/PDS/inner1.ply' # 内部点のみ表示
+result_ply_path = 'Output/PDS/pds1.ply'
+result_csv_path = 'Output/PDS/pds1.csv'
 
 def main():
-    points_obj_list = []  # Pointオブジェクトを保持
-    fixed_points = [] # 確定点格納用
+    surface_Points = [] # 表面確定点格納用
+    inner_Points = [] # 内部確定点格納用
 
     # ANSYS上の点群を取得し座標値を取得
     points = np.loadtxt(input_path, delimiter=',')
     print('points = ',points[0:3])
-    
-    # FEMの節点の読み込み
-    print('FEM節点を読み込んでいます')
-    for i in range(len(points)):
-        point = Point.Point(points[i]) # クラスに格納
-        point.system_guid_obj_to_coordinate()
-        points_obj_list.append(point)
-    
-    
+        
     rbf = Rbf(points[:,1], points[:,2], points[:,3], points[:,4], function='multiquadric')
-    print('rbf:   ', rbf(points[10,1], points[10,2], points[10,3]))
-    print('stress:   ', points[10,4])
     # PDSでの点の生成範囲の設定
     x_max = points[0,1]
     x_min = points[0,1]
@@ -81,18 +62,22 @@ def main():
     print("x_max = ", x_max, "x_min = ", x_min)
     print("y_max = ", y_max, "y_min = ", y_min)
     print("z_max = ", z_max, "z_min = ", z_min)
-    # print('super_box : ', super_box)
 
     # 交差数判定法
     CNA = CrossingNumberAlgorithm.CrossingNumberAlgorithm(mesh_data)
 
-
     # PDS用
-    CD = CheckDistance.CheckDistance(ALLOWABLE_STRESS)
+    CD = CheckDistance.CheckDistance(ALLOWABLE_STRESS, RADIUS)
+
+    #物体表面上でPDS
+    CNA.surface_generate(surface_Points, PITCH_SURFACE, PITCH_MABIKI)
+    #重複した座標を削除
+    surface_Points, _ = np.unique(surface_Points, return_index=True, axis=0)
+
 
     num = 0
     while num < MAXIMUM_NUMBER_OF_SEARCHES:
-        if len(fixed_points) >= MAXIMUM_NUMBER_OF_POINTS:
+        if len(inner_Points) >= MAXIMUM_NUMBER_OF_POINTS:
             break
 
         flg_P = False
@@ -101,71 +86,75 @@ def main():
             pds_x = random.uniform(x_min, x_max)
             pds_y = random.uniform(y_min, y_max)
             pds_z = random.uniform(z_min, z_max)
-            pds_point = [pds_x, pds_y, pds_z]
-            #print("pds_point : ",pds_point)
+            candidate_point = [pds_x, pds_y, pds_z]
     
             # 物体内部の点か判定
-            flg_P = CNA.cramer(pds_point)
+            flg_P = CNA.cramer(candidate_point)
 
-        # 生成点の座標情報をPointに格納し候補点にする
-        candidate_point = Point.Point(pds_point)
-        candidate_point.pds_coordinate()
-        new_stress = rbf(candidate_point.x, candidate_point.y, candidate_point.z)
+        new_stress = rbf(candidate_point[0], candidate_point[1], candidate_point[2])
         # 点間距離内に他の点が含まれているか否かを判定
-        flg = CD.check_distance(fixed_points, candidate_point, new_stress)
+        flg = CD.check_distance(inner_Points, candidate_point, new_stress)
 
         # 点間距離内に他の点が存在しないとき候補点を確定点に追加
         if flg:
-            fixed_points.append(pds_point)
+            inner_Points.append(candidate_point)
             num = 0
-            print('num : ', num, 'fixed_points : ', len(fixed_points))
+            print('num : ', num, 'inner_Points : ', len(inner_Points))
         # 点間距離内に他の点が存在するとき
         else :
             num = num + 1
             print('num : ', num)
 
 
-    # ply にPDSの内部点のみ結果出力
-    #重複した座標を削除
-    fixed_Inpoints = fixed_points
-    fixed_Inpoints, _ = np.unique(fixed_points, return_index=True, axis=0)
-    with open(resultIn_ply_path, 'w', newline="") as f:
+    # ply にPDSの表面点のみ結果出力
+    inner_Points, _ = np.unique(inner_Points, return_index=True, axis=0) # 重複した座標を削除
+    with open(surface_Points_path, 'w', newline="") as f:
         f.write('ply\n')
         f.write('format ascii 1.0\n')
-        f.write('element vertex '+str(len(fixed_Inpoints))+'\n')
+        f.write('element vertex '+str(len(surface_Points))+'\n')
         f.write('property double x\n')
         f.write('property double y\n')
         f.write('property double z\n')
         f.write('end_header\n')
-        for ele in fixed_Inpoints:
+        for ele in surface_Points:
             f.write(str(ele[0])+' '+str(ele[1])+' '+str(ele[2])+' '+'\n')
 
-    #max，minのdensityを表示
-    CD.print_max_min_density()
-
-    #物体表面上でPDS
-    CNA.surface_kikalab(fixed_points, PITCH, PDS_PITCH)
-
-    #重複した座標を削除
-    fixed_points, _ = np.unique(fixed_points, return_index=True, axis=0)
+    # ply にPDSの内部点のみ結果出力
+    inner_Points, _ = np.unique(inner_Points, return_index=True, axis=0) # 重複した座標を削除
+    with open(inner_Points_path, 'w', newline="") as f:
+        f.write('ply\n')
+        f.write('format ascii 1.0\n')
+        f.write('element vertex '+str(len(inner_Points))+'\n')
+        f.write('property double x\n')
+        f.write('property double y\n')
+        f.write('property double z\n')
+        f.write('end_header\n')
+        for ele in inner_Points:
+            f.write(str(ele[0])+' '+str(ele[1])+' '+str(ele[2])+' '+'\n')
 
     # ply にPDSの結果出力
-    print("fixed_points  = ", len(fixed_points), "個")
+    fixed_Points = np.concatenate([surface_Points, inner_Points]) # 結合
+    fixed_Points, _ = np.unique(fixed_Points, return_index=True, axis=0) # 重複した座標を削除
     with open(result_ply_path, 'w', newline="") as f:
         f.write('ply\n')
         f.write('format ascii 1.0\n')
-        f.write('element vertex '+str(len(fixed_points))+'\n')
+        f.write('element vertex '+str(len(fixed_Points))+'\n')
         f.write('property double x\n')
         f.write('property double y\n')
         f.write('property double z\n')
         f.write('end_header\n')
-        for ele in fixed_points:
+        for ele in fixed_Points:
             f.write(str(ele[0])+' '+str(ele[1])+' '+str(ele[2])+' '+'\n')
 
     # csv にPDSの結果出力
     with open(result_csv_path, 'w', newline="") as f:
         writer = csv.writer(f)
-        writer.writerows(fixed_points)
+        writer.writerows(fixed_Points)
+
+    # 点の個数を出力
+    print("fixed_Points:   ", len(fixed_Points))
+    print("surface_Points:   ", len(surface_Points))
+    print("inner_Points:    ", len(inner_Points))
     
 
 
