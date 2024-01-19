@@ -9,7 +9,6 @@ EPSILON = 0.00000001
 #交差数判定法
 class CrossingNumberAlgorithm:
     def __init__(self, mesh_data):
-        #self.origin = np.array([(x_max+x_min)/2, (y_max+y_min)/2, (z_max+z_min)/2])
         # 表面形状データの読み込み
         print("読み込み中...")
         # 3Dメッシュデータを読み込む
@@ -24,14 +23,11 @@ class CrossingNumberAlgorithm:
         #surface用にnp変換
         self.np_list1 = np.array(self.list1)
         self.np_list2 = np.array(self.list2)
-        print('np_list1 = ',self.np_list1[:5])
-        print('np_list2 = ',self.np_list2[:5])    
-        print('len(np_list1) = ', len(self.np_list1))
         print("読み込み終了")
 
 
-    #物体表面上に点を生成（キカラボさん手法）       
-    def surface_kikalab(self, fixed_points, PITCH, PDS_PITCH):
+    #物体表面上に点を生成       
+    def surface_generate(self, fixed_points, PITCH, PDS_PITCH):
         tentative_points = [] # 物体表面上の点群用
         for list2 in self.np_list2:
             #値の設定
@@ -70,16 +66,12 @@ class CrossingNumberAlgorithm:
         
         # post_tentative_points = thinning(tentative_points, RATE_OF_THINNINGS) # 間引き
         post_tentative_points = thinning_pds(tentative_points, PDS_PITCH) # 間引き
-        print('間引き前len(tentative_points) = ', len(tentative_points))
-        print('間引き後len(tentative_points) = ', len(post_tentative_points))
         fixed_points.extend(post_tentative_points)
-        print('len(fixed_points) = ', len(fixed_points))
 
 
     def cramer(self, pds_point): #クラメルの公式を用いて内外判定
         #ray = self.origin - pds_point
         ray = [10, 10, 9]
-        #print('ray : ', ray)
         cross_num = 0
         edge_count = 0
         for l in self.list2:
@@ -94,7 +86,6 @@ class CrossingNumberAlgorithm:
                     [OA[1], OB[1], -ray[1]], 
                     [OA[2], OB[2], -ray[2]]]
 
-            # solution = np.linalg.solve(left, right)
             solution = solve_linear_equation(left, right)
 
             # 解が存在するか否かを判断
@@ -112,15 +103,11 @@ class CrossingNumberAlgorithm:
                     print('(u, v, u+v) = ', u, v, u+v)
                     edge_count += 1
                 cross_num += 1 #三角形の平面内で交点を持つ → カウント
-                #
-                # print('u, v, t = ', u, v, t)
-                #print('{:.1000f}'.format(u))
 
             else:
                 continue #三角形の平面外で交点を持つ
         
         if edge_count != 0: print('edge_count = ', edge_count)        
-        #print('cross_num', cross_num)
         if (cross_num - edge_count/2) % 2 == 0:
             flg = False #外側
         else:
@@ -257,9 +244,7 @@ def thinning(points, RATE_OF_THINNINGS):
     points, _ = np.unique(points, return_index=True, axis=0) #重複した座標を削除．return_index=Trueとすることでsortなしになる
     print(points)
     points = points.tolist() # ndarrayをlistに変換
-    print('重複削除len(tentative) = ' , len(points))
     num_trials = math.floor(len(points)*(1.0 - RATE_OF_THINNINGS))
-    print('num_trials = ' , num_trials)
 
     for _ in range(num_trials):
         num_points = len(points)
@@ -275,7 +260,6 @@ def thinning_pds(points, PDS_PITCH):
     points, _ = np.unique(points, return_index=True, axis=0) #重複した座標を削除．return_index=Trueとすることでsortなしになる
     print(points)
     points = points.tolist() # ndarrayをlistに変換
-    print('重複削除len(tentative) = ' , len(points))
     PDS_PITCH_SQUARE = PDS_PITCH**2
     fixed_points = [] # 確定点
     fixed_points.append(points[0])
@@ -295,8 +279,7 @@ def thinning_pds(points, PDS_PITCH):
         if flg:
             fixed_points.append(attention_point)
         i+=1
-        print('i : ', i)
-    print('間引き前表面生成点(重複削除済み): ', i)
+        print('間引き中...   i :   ', i)
 
     return fixed_points
 
