@@ -1,5 +1,4 @@
 # Delaunay分割後、メッシュ生成
-
 import numpy as np
 from scipy.spatial import Delaunay
 import time
@@ -17,9 +16,9 @@ start = time.time()  # 時間計測用
 edges = [] # PLYファイルのedge用
 
 
-Input_file = 'Output/result_main/cube_50x50mm/result_76.csv' # Inputファイル
-mesh_data = 'Input/Mesh_Data/cube_50x50mm_mesh.stl' # 物体の表面形状データ。
-Output_file = 'Output/Delaunay_Python/delaunay_mesh.ply' # Outputファイル
+Input_file = 'Output/PDS/pds3/pds3.csv' # Inputファイル
+mesh_data = 'Input/Mesh_Data/Hourgrass2_mesh.stl' # 物体の表面形状データ。
+Output_file = 'Output/Delaunay/delaunay3.ply' # Outputファイル
 
 # ファイルの読み込み。物体の頂点を定義する
 vertices = np.loadtxt(Input_file, delimiter=',')
