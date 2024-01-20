@@ -7,23 +7,22 @@ import time
 import random
 
 # define
-MAXIMUM_NUMBER_OF_SEARCHES = 800 # 点が連続でN回生成できなかったら終了
-MAXIMUM_NUMBER_OF_POINTS = 600 # 物体内部最大生成点数
+MAXIMUM_NUMBER_OF_SEARCHES = 1000 # 点が連続でN回生成できなかったら終了
+MAXIMUM_NUMBER_OF_POINTS = 1000 # 物体内部最大生成点数
 PITCH_SURFACE = 1 # 物体表面に点群を生成するときに用いる．
 PITCH_MABIKI = 3 # 物体表面に生成した点から間引きを行う際のPDSの最小点間距離
 ALLOWABLE_STRESS = 186 #チタン合金．降伏強さ930MPa．安全率5
-RADIUS = 0.05 # ラティス半径[mm]
-
+RADIUS = 0.5 # ラティス半径[mm]
 
 # Inputファイル
-input_path = './Input/Stress/cube_50x50mm.csv' # ANSYSのデータファイル
-mesh_data = 'Input/Mesh_Data/cube_50x50mm_mesh.stl' # 物体の表面形状データ。
+input_path = 'Input/Stress/HourGrass2_stress.csv' # ANSYSのデータファイル
+mesh_data = 'Input/Mesh_Data/Hourgrass2_mesh.stl' # 物体の表面形状データ。
 
 # Outputファイル
-surface_Points_path = 'Output/PDS/surface1.ply' # 表面点のみ表示
-inner_Points_path = 'Output/PDS/inner1.ply' # 内部点のみ表示
-result_ply_path = 'Output/PDS/pds1.ply'
-result_csv_path = 'Output/PDS/pds1.csv'
+surface_Points_path = 'Output/PDS/surface6.ply' # 表面点のみ表示
+inner_Points_path = 'Output/PDS/inner4.ply' # 内部点のみ表示
+result_ply_path = 'Output/PDS/pds4.ply'
+result_csv_path = 'Output/PDS/pds4.csv'
 
 def main():
     surface_Points = [] # 表面確定点格納用
@@ -34,34 +33,21 @@ def main():
     print('points = ',points[0:3])
         
     rbf = Rbf(points[:,1], points[:,2], points[:,3], points[:,4], function='multiquadric')
-    # PDSでの点の生成範囲の設定
-    x_max = points[0,1]
-    x_min = points[0,1]
-    y_max = points[0,2]
-    y_min = points[0,2]
-    z_max = points[0,3]
-    z_min = points[0,3]
     
-    for point in points:
-        if point[1] > x_max:
-            x_max = point[1]
-        if point[1] < x_min:
-            x_min = point[1]
-        
-        if point[2] > y_max:
-            y_max = point[2]
-        if point[2] < y_min:
-            y_min = point[2]
-
-        if point[3] > z_max:
-            z_max = point[3]
-        if point[3] < z_min:
-            z_min = point[3]
+    # PDSでの点の生成範囲の設定
+    x_max = np.amax(points[:,1])
+    x_min = np.amin(points[:,1])
+    y_max = np.amax(points[:,2])
+    y_min = np.amin(points[:,2])
+    z_max = np.amax(points[:,3])
+    z_min = np.amin(points[:,3])
     
     # PDSでの点の生成範囲の表示
     print("x_max = ", x_max, "x_min = ", x_min)
     print("y_max = ", y_max, "y_min = ", y_min)
     print("z_max = ", z_max, "z_min = ", z_min)
+
+    #time.sleep(10)
 
     # 交差数判定法
     CNA = CrossingNumberAlgorithm.CrossingNumberAlgorithm(mesh_data)
