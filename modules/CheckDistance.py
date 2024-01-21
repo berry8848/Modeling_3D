@@ -32,5 +32,5 @@ def stress_to_density(stress, ALLOWABLE_STRESS):
 
 # 密度と点間距離の関係式
 def density_to_long(density, r):
-    long = 6 * r * math.sqrt(math.sqrt(2)*math.pi/ density)
+    long = r * math.sqrt(6*math.sqrt(2)*math.pi/ density)
     return long
